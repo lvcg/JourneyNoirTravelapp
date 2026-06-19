@@ -15,11 +15,15 @@ import {
   where,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import {
+  EmailAuthProvider,
   GoogleAuthProvider,
   OAuthProvider,
   createUserWithEmailAndPassword,
   getAuth,
+  linkWithCredential,
+  linkWithPopup,
   onAuthStateChanged,
+  signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -227,6 +231,7 @@ let submissionsCollection = null;
 let itinerariesCollection = null;
 let journalCollection = null;
 let lastGuideFetchKey = "";
+let isStartingGuestSession = false;
 
 hydrateCityFilter();
 renderGuide();
@@ -252,19 +257,22 @@ if (!hasFirebaseConfig) {
     setDisabledState(!user);
 
     if (!user) {
-      accountCopy.textContent = "You are logged out.";
+      accountCopy.textContent = "Starting guest session.";
       savedList.innerHTML = "";
       journalList.innerHTML = "";
       adminList.innerHTML = '<div class="empty-state">Admin login required.</div>';
       savedCount.textContent = "0";
       adminCount.textContent = "0";
-      setStatus("Login to save places, submit listings, and build trips.");
+      setStatus("Starting a secure guest session.");
+      await startGuestSession();
       return;
     }
 
     const token = await user.getIdTokenResult();
     isAdmin = Boolean(token.claims.admin);
-    accountCopy.textContent = `Logged in as ${user.email || user.displayName || "traveler"}.`;
+    accountCopy.textContent = user.isAnonymous
+      ? "Browsing as a guest traveler. Create an account to keep this profile long term."
+      : `Logged in as ${user.email || user.displayName || "traveler"}.`;
     favoritesCollection = collection(db, "users", user.uid, "favorites");
     tripsCollection = collection(db, "users", user.uid, "trips");
     submissionsCollection = collection(db, "submissions");
@@ -276,7 +284,7 @@ if (!hasFirebaseConfig) {
     watchSavedPlans();
     watchJournal();
     if (isAdmin) watchAdminSubmissions();
-    setStatus("Connected to Firebase.");
+    setStatus(user.isAnonymous ? "Guest session connected to Firebase." : "Connected to Firebase.");
   });
 }
 
@@ -312,7 +320,12 @@ authForm.addEventListener("submit", async (event) => {
 
   try {
     if (event.submitter.dataset.authMode === "signup") {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const credential = EmailAuthProvider.credential(email, password);
+      if (currentUser?.isAnonymous) {
+        await linkWithCredential(currentUser, credential);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
       setStatus("Account created.");
     } else {
       await signInWithEmailAndPassword(auth, email, password);
@@ -329,7 +342,7 @@ appleLogin.addEventListener("click", () => signInWithProvider(new OAuthProvider(
 logoutButton.addEventListener("click", () => {
   if (!auth) return;
   signOut(auth)
-    .then(() => setStatus("Logged out."))
+    .then(() => setStatus("Signed out. Guest mode will reconnect automatically."))
     .catch((error) => setStatus(`Logout failed: ${error.message}`));
 });
 
@@ -494,10 +507,27 @@ notificationButton.addEventListener("click", async () => {
 async function signInWithProvider(provider) {
   if (!auth) return;
   try {
-    await signInWithPopup(auth, provider);
+    if (currentUser?.isAnonymous) {
+      await linkWithPopup(currentUser, provider);
+    } else {
+      await signInWithPopup(auth, provider);
+    }
     setStatus("Logged in.");
   } catch (error) {
     setStatus(`Provider login failed: ${friendlyAuthError(error)}`);
+  }
+}
+
+async function startGuestSession() {
+  if (!auth || isStartingGuestSession) return;
+  isStartingGuestSession = true;
+  try {
+    await signInAnonymously(auth);
+  } catch (error) {
+    setDisabledState(true);
+    setStatus(`Guest login failed: ${friendlyAuthError(error)}`);
+  } finally {
+    isStartingGuestSession = false;
   }
 }
 
@@ -1024,6 +1054,7 @@ function friendlyAuthError(error) {
     "auth/popup-closed-by-user": "Login popup closed before finishing.",
     "auth/unauthorized-domain": "Add this Vercel domain to Firebase Authentication authorized domains.",
     "auth/weak-password": "Use a password with at least 6 characters.",
+    "auth/admin-restricted-operation": "Enable Anonymous sign-in in Firebase Authentication.",
   };
   return messages[code] || error?.message || "Please try again.";
 }

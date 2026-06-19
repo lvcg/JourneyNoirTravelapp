@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check api/aggregate.js"
+    "check": "node --check app.js && node --check api/aggregate.js"
+  },
+  "dependencies": {
+    "firebase": "^12.15.0"
   }
 }
