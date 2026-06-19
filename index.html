@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rooted Routes | Black Travel Guide</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#home" aria-label="Rooted Routes home">
+        <span class="brand-mark">RR</span>
+        <span>Rooted Routes</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#guide">Guide</a>
+        <a href="#planner">Planner</a>
+        <a href="#login">Login</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="home">
+        <div class="hero-copy">
+          <p class="eyebrow">Black travel guide</p>
+          <h1>Find Black businesses, events, and culture.</h1>
+          <p>
+            Explore major-city guides with verified businesses, cultural
+            landmarks, and local events you can save into a trip.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#guide">Explore guide</a>
+            <a class="button button-secondary" href="#submit">Add a place</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-band" id="guide" aria-labelledby="guide-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Major city aggregator</p>
+            <h2 id="guide-title">Businesses and events</h2>
+          </div>
+          <span class="count-pill" id="guide-count">0</span>
+        </div>
+
+        <div class="guide-controls">
+          <label>
+            City
+            <select id="city-filter"></select>
+          </label>
+          <label>
+            Search
+            <input id="guide-search" type="search" placeholder="brunch, museum, Juneteenth" />
+          </label>
+          <div class="filters" aria-label="Filter places">
+            <button class="chip active" type="button" data-filter="all">All</button>
+            <button class="chip" type="button" data-filter="business">Businesses</button>
+            <button class="chip" type="button" data-filter="event">Events</button>
+            <button class="chip" type="button" data-filter="restaurant">Food</button>
+            <button class="chip" type="button" data-filter="hotel">Stays</button>
+            <button class="chip" type="button" data-filter="museum">Museums</button>
+            <button class="chip" type="button" data-filter="cultural_site">Culture</button>
+          </div>
+        </div>
+
+        <div class="guide-grid" id="guide-grid"></div>
+      </section>
+
+      <section class="split-band" id="planner" aria-labelledby="planner-title">
+        <div class="panel">
+          <p class="eyebrow">Trip builder</p>
+          <h2 id="planner-title">Save places to your itinerary</h2>
+          <p>
+            Login to save guide entries, add your own verified finds, and keep
+            trip notes in Firestore.
+          </p>
+
+          <form class="stacked-form" id="trip-form">
+            <div class="form-grid">
+              <label>
+                Trip name
+                <input name="tripName" type="text" placeholder="Atlanta weekend" required />
+              </label>
+              <label>
+                City
+                <input name="city" type="text" placeholder="Atlanta" required />
+              </label>
+              <label>
+                Start date
+                <input name="startDate" type="date" required />
+              </label>
+              <label>
+                End date
+                <input name="endDate" type="date" required />
+              </label>
+            </div>
+            <label>
+              Notes
+              <textarea
+                name="notes"
+                rows="4"
+                placeholder="Restaurants, exhibits, neighborhoods, transit notes..."
+              ></textarea>
+            </label>
+            <button class="button button-primary" type="submit">Save trip</button>
+          </form>
+        </div>
+
+        <div class="panel saved-panel">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">Your account</p>
+              <h2>Saved plans</h2>
+            </div>
+            <span class="count-pill" id="saved-count">0</span>
+          </div>
+          <p class="status" id="status" role="status"></p>
+          <div class="saved-list" id="saved-list"></div>
+        </div>
+      </section>
+
+      <section class="split-band" id="login" aria-labelledby="login-title">
+        <div class="panel auth-panel">
+          <p class="eyebrow">Login</p>
+          <h2 id="login-title">Create an account or sign in</h2>
+          <p>
+            Firebase Authentication keeps saved places and submitted listings
+            tied to your account.
+          </p>
+
+          <form class="stacked-form" id="auth-form">
+            <label>
+              Email
+              <input name="email" type="email" placeholder="you@example.com" required />
+            </label>
+            <label>
+              Password
+              <input
+                name="password"
+                type="password"
+                minlength="6"
+                placeholder="At least 6 characters"
+                required
+              />
+            </label>
+            <div class="button-row">
+              <button class="button button-primary" type="submit" data-auth-mode="login">
+                Login
+              </button>
+              <button class="button button-secondary" type="submit" data-auth-mode="signup">
+                Create account
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel logout-panel" aria-labelledby="account-title">
+          <p class="eyebrow">Logout page</p>
+          <h2 id="account-title">Account</h2>
+          <p id="account-copy">Add Firebase config to enable account features.</p>
+          <button class="button button-secondary" id="logout-button" type="button">
+            Logout
+          </button>
+        </div>
+      </section>
+
+      <section class="content-band" id="submit" aria-labelledby="submit-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Contributor workflow</p>
+            <h2 id="submit-title">Add a verified listing</h2>
+          </div>
+        </div>
+
+        <form class="stacked-form wide-form" id="listing-form">
+          <div class="form-grid three">
+            <label>
+              Name
+              <input name="name" type="text" required />
+            </label>
+            <label>
+              Category
+              <select name="category" required>
+                <option value="restaurant">Restaurant</option>
+                <option value="hotel">Hotel</option>
+                <option value="museum">Museum</option>
+                <option value="cultural_site">Cultural site</option>
+                <option value="event">Event</option>
+              </select>
+            </label>
+            <label>
+              Listing type
+              <select name="listingType" required>
+                <option value="business">Business / attraction</option>
+                <option value="event">Event</option>
+              </select>
+            </label>
+            <label>
+              Black-owned
+              <select name="blackOwned" required>
+                <option value="true">Yes</option>
+                <option value="false">No / cultural site</option>
+              </select>
+            </label>
+            <label>
+              Ownership source
+              <input name="ownershipSource" type="url" placeholder="Official source URL" />
+            </label>
+            <label>
+              Address
+              <input name="address" type="text" />
+            </label>
+            <label>
+              City
+              <input name="city" type="text" required />
+            </label>
+            <label>
+              State
+              <input name="state" type="text" maxlength="2" placeholder="IL" />
+            </label>
+            <label>
+              Website
+              <input name="website" type="url" />
+            </label>
+            <label>
+              Phone
+              <input name="phone" type="tel" />
+            </label>
+            <label>
+              Hours
+              <input name="hours" type="text" placeholder="See official site" />
+            </label>
+            <label>
+              Event date
+              <input name="eventDate" type="date" />
+            </label>
+            <label>
+              Price range
+              <input name="priceRange" type="text" placeholder="$, $$, $$$" />
+            </label>
+            <label>
+              Tags
+              <input name="tags" type="text" placeholder="soul food, brunch, historic" />
+            </label>
+            <label>
+              Latitude
+              <input name="latitude" type="number" step="any" />
+            </label>
+            <label>
+              Longitude
+              <input name="longitude" type="number" step="any" />
+            </label>
+            <label>
+              Source URL
+              <input name="sourceUrl" type="url" required />
+            </label>
+          </div>
+          <button class="button button-primary" type="submit">Submit listing</button>
+        </form>
+      </section>
+
+    </main>
+
+    <template id="place-card-template">
+      <article class="place-card">
+        <div class="place-card__top">
+          <span class="category-pill" data-category></span>
+          <span class="verified-pill" data-verified></span>
+        </div>
+        <h3 data-name></h3>
+        <p data-location></p>
+        <p data-tags></p>
+        <dl>
+          <div>
+            <dt>Type</dt>
+            <dd data-type></dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd><a data-source target="_blank" rel="noreferrer">Open</a></dd>
+          </div>
+          <div>
+            <dt>Verified</dt>
+            <dd data-last-verified></dd>
+          </div>
+        </dl>
+        <button class="button button-secondary" type="button" data-save-place>
+          Save place
+        </button>
+      </article>
+    </template>
+
+    <template id="saved-card-template">
+      <article class="saved-card">
+        <div>
+          <h3 data-title></h3>
+          <p data-detail></p>
+        </div>
+        <button class="icon-button" type="button" data-delete aria-label="Delete item">
+          &times;
+        </button>
+      </article>
+    </template>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
