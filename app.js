@@ -337,7 +337,11 @@ authForm.addEventListener("submit", async (event) => {
   }
 });
 
-googleLogin.addEventListener("click", () => signInWithProvider(new GoogleAuthProvider()));
+googleLogin.addEventListener("click", () => {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  signInWithProvider(provider);
+});
 appleLogin.addEventListener("click", () => signInWithProvider(new OAuthProvider("apple.com")));
 logoutButton.addEventListener("click", () => {
   if (!auth) return;
@@ -508,7 +512,12 @@ async function signInWithProvider(provider) {
   if (!auth) return;
   try {
     if (currentUser?.isAnonymous) {
-      await linkWithPopup(currentUser, provider);
+      try {
+        await linkWithPopup(currentUser, provider);
+      } catch (error) {
+        if (!shouldRetryProviderSignIn(error)) throw error;
+        await signInWithPopup(auth, provider);
+      }
     } else {
       await signInWithPopup(auth, provider);
     }
@@ -516,6 +525,15 @@ async function signInWithProvider(provider) {
   } catch (error) {
     setStatus(`Provider login failed: ${friendlyAuthError(error)}`);
   }
+}
+
+function shouldRetryProviderSignIn(error) {
+  return [
+    "auth/account-exists-with-different-credential",
+    "auth/credential-already-in-use",
+    "auth/email-already-in-use",
+    "auth/provider-already-linked",
+  ].includes(error?.code);
 }
 
 async function startGuestSession() {
@@ -1049,9 +1067,12 @@ function friendlyAuthError(error) {
   const code = error?.code || "";
   const messages = {
     "auth/email-already-in-use": "That email already has an account. Try logging in.",
+    "auth/account-exists-with-different-credential": "This email already exists with another sign-in method.",
+    "auth/credential-already-in-use": "That Google account is already connected. Signing in directly is required.",
     "auth/invalid-credential": "Email or password is incorrect.",
     "auth/operation-not-allowed": "Enable this sign-in provider in Firebase Authentication.",
     "auth/popup-closed-by-user": "Login popup closed before finishing.",
+    "auth/popup-blocked": "Allow popups for this site and try Google login again.",
     "auth/unauthorized-domain": "Add this Vercel domain to Firebase Authentication authorized domains.",
     "auth/weak-password": "Use a password with at least 6 characters.",
     "auth/admin-restricted-operation": "Enable Anonymous sign-in in Firebase Authentication.",
