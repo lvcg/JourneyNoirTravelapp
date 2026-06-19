@@ -31,12 +31,13 @@ export default async function handler(req, res) {
 
   const citySlug = String(req.query.city || "chicago-il");
   const city = CITY_COORDS[citySlug] || CITY_COORDS["chicago-il"];
-  const query = String(req.query.q || DEFAULT_TERMS.join(" ")).slice(0, 120);
+  const customQuery = String(req.query.q || "").trim();
+  const query = (customQuery || DEFAULT_TERMS.join(" ")).slice(0, 120);
   const limit = Math.min(Number(req.query.limit) || 12, 25);
 
   const settled = await Promise.allSettled([
     fetchFoursquare(city, query, limit),
-    fetchGeoapify(city, query, limit),
+    fetchGeoapify(city, query, limit, Boolean(customQuery)),
     fetchEventbrite(city, query, limit),
   ]);
 
@@ -44,7 +45,10 @@ export default async function handler(req, res) {
   const errors = [];
   const results = settled.flatMap((result, index) => {
     if (result.status === "fulfilled") return result.value;
-    errors.push({ provider: providers[index], message: result.reason?.message || "Failed" });
+    errors.push({
+      provider: providers[index],
+      message: friendlyProviderError(result.reason?.message || "Failed"),
+    });
     return [];
   });
 
@@ -95,12 +99,12 @@ async function fetchFoursquare(city, query, limit) {
   }));
 }
 
-async function fetchGeoapify(city, query, limit) {
+async function fetchGeoapify(city, query, limit, hasCustomQuery = false) {
   if (!process.env.GEOAPIFY_API_KEY) return [];
   const url = new URL("https://api.geoapify.com/v2/places");
   url.searchParams.set(
     "categories",
-    "catering.restaurant,accommodation.hotel,tourism.museum,tourism.sights,entertainment.culture",
+    "catering.restaurant,accommodation.hotel,entertainment.museum,entertainment.culture",
   );
   url.searchParams.set("filter", `circle:${city.lng},${city.lat},25000`);
   url.searchParams.set("bias", `proximity:${city.lng},${city.lat}`);
@@ -117,6 +121,7 @@ async function fetchGeoapify(city, query, limit) {
       ]
         .join(" ")
         .toLowerCase();
+      if (!hasCustomQuery) return true;
       return query
         .toLowerCase()
         .split(/\s+/)
@@ -180,6 +185,13 @@ async function fetchEventbrite(city, query, limit) {
     lng: Number(event.venue?.longitude) || null,
     rating: 0,
   }));
+}
+
+function friendlyProviderError(message) {
+  if (message.includes("401") || message.includes("403")) return "Check provider API key permissions.";
+  if (message.includes("400")) return "Provider rejected request parameters.";
+  if (message.includes("404")) return "Provider endpoint or token access was not accepted.";
+  return message;
 }
 
 async function fetchJson(url, options = {}) {
