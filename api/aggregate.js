@@ -26,6 +26,9 @@ const DEFAULT_TERMS = [
   "festival",
 ];
 
+const DEFAULT_PLACE_SEARCHES = ["restaurant", "hotel", "museum", "jazz"];
+const DEFAULT_EVENT_SEARCH = "jazz festival culture";
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "s-maxage=900, stale-while-revalidate=3600");
 
@@ -36,12 +39,13 @@ export default async function handler(req, res) {
   const limit = Math.min(Number(req.query.limit) || 12, 25);
 
   const settled = await Promise.allSettled([
-    fetchFoursquare(city, query, limit),
+    fetchFoursquare(city, query, limit, Boolean(customQuery)),
     fetchGeoapify(city, query, limit, Boolean(customQuery)),
-    fetchEventbrite(city, query, limit),
+    fetchEventbrite(city, query, limit, Boolean(customQuery)),
+    fetchWikipedia(city, query, limit, Boolean(customQuery)),
   ]);
 
-  const providers = ["foursquare", "geoapify", "eventbrite"];
+  const providers = ["foursquare", "geoapify", "eventbrite", "wikipedia"];
   const errors = [];
   const results = settled.flatMap((result, index) => {
     if (result.status === "fulfilled") return result.value;
@@ -52,34 +56,53 @@ export default async function handler(req, res) {
     return [];
   });
 
+  const dedupedResults = dedupeListings(results);
+
   res.status(200).json({
     city: city.label,
     query,
-    count: results.length,
-    results: dedupeListings(results),
+    count: dedupedResults.length,
+    results: dedupedResults,
     errors,
   });
 }
 
-async function fetchFoursquare(city, query, limit) {
+async function fetchFoursquare(city, query, limit, hasCustomQuery = false) {
   if (!process.env.FOURSQUARE_API_KEY) return [];
-  const url = new URL("https://api.foursquare.com/v3/places/search");
-  url.searchParams.set("near", city.label);
-  url.searchParams.set("query", query);
-  url.searchParams.set("limit", String(limit));
-  url.searchParams.set("fields", "fsq_id,name,location,geocodes,categories,website,tel,price,rating");
+  const searches = hasCustomQuery ? [query] : DEFAULT_PLACE_SEARCHES;
+  const perSearchLimit = Math.max(3, Math.ceil(limit / searches.length));
+  const settled = await Promise.allSettled(
+    searches.map((term) => {
+      const url = new URL("https://api.foursquare.com/v3/places/search");
+      url.searchParams.set("ll", `${city.lat},${city.lng}`);
+      url.searchParams.set("radius", "25000");
+      url.searchParams.set("query", term);
+      url.searchParams.set("sort", "POPULARITY");
+      url.searchParams.set("limit", String(perSearchLimit));
+      url.searchParams.set("fields", "fsq_id,name,location,geocodes,categories,website,tel,price,rating");
 
-  const json = await fetchJson(url, {
-    headers: {
-      Accept: "application/json",
-      Authorization: process.env.FOURSQUARE_API_KEY,
-      "X-Places-Api-Version": "1970-01-01",
-    },
-  });
+      return fetchJson(url, {
+        headers: {
+          Accept: "application/json",
+          Authorization: process.env.FOURSQUARE_API_KEY,
+          "X-Places-Api-Version": "1970-01-01",
+        },
+      });
+    }),
+  );
 
-  return (json.results || []).map((place) => ({
+  const rejected = settled.find((result) => result.status === "rejected");
+  if (rejected && settled.every((result) => result.status === "rejected")) {
+    throw rejected.reason;
+  }
+
+  return settled
+    .flatMap((result) => (result.status === "fulfilled" ? result.value.results || [] : []))
+    .slice(0, limit)
+    .map((place) => ({
     id: `foursquare-${place.fsq_id}`,
     provider: "Foursquare",
+    dataProvider: "Foursquare",
     listingType: "business",
     name: place.name,
     category: inferCategory(place.categories?.[0]?.name),
@@ -130,6 +153,7 @@ async function fetchGeoapify(city, query, limit, hasCustomQuery = false) {
     .map((feature) => ({
       id: `geoapify-${feature.properties?.place_id}`,
       provider: "Geoapify",
+      dataProvider: "Geoapify",
       listingType: "business",
       name: feature.properties?.name || "Unnamed place",
       category: inferCategory(feature.properties?.categories?.join(" ")),
@@ -149,10 +173,10 @@ async function fetchGeoapify(city, query, limit, hasCustomQuery = false) {
     }));
 }
 
-async function fetchEventbrite(city, query, limit) {
+async function fetchEventbrite(city, query, limit, hasCustomQuery = false) {
   if (!process.env.EVENTBRITE_PRIVATE_TOKEN) return [];
   const url = new URL("https://www.eventbriteapi.com/v3/events/search/");
-  url.searchParams.set("q", query);
+  url.searchParams.set("q", hasCustomQuery ? query : DEFAULT_EVENT_SEARCH);
   url.searchParams.set("location.address", city.label);
   url.searchParams.set("location.within", "25mi");
   url.searchParams.set("expand", "venue,logo");
@@ -167,6 +191,7 @@ async function fetchEventbrite(city, query, limit) {
   return (json.events || []).slice(0, limit).map((event) => ({
     id: `eventbrite-${event.id}`,
     provider: "Eventbrite",
+    dataProvider: "Eventbrite",
     listingType: "event",
     name: event.name?.text || "Untitled event",
     category: "event",
@@ -185,6 +210,49 @@ async function fetchEventbrite(city, query, limit) {
     lng: Number(event.venue?.longitude) || null,
     rating: 0,
   }));
+}
+
+async function fetchWikipedia(city, query, limit, hasCustomQuery = false) {
+  const url = new URL("https://en.wikipedia.org/w/api.php");
+  url.searchParams.set("origin", "*");
+  url.searchParams.set("action", "query");
+  url.searchParams.set("format", "json");
+  url.searchParams.set("list", "geosearch");
+  url.searchParams.set("gscoord", `${city.lat}|${city.lng}`);
+  url.searchParams.set("gsradius", "10000");
+  url.searchParams.set("gslimit", String(limit));
+
+  const json = await fetchJson(url);
+  return (json.query?.geosearch || [])
+    .filter((place) => {
+      if (!hasCustomQuery) return true;
+      const searchable = `${place.title || ""}`.toLowerCase();
+      return query
+        .toLowerCase()
+        .split(/\s+/)
+        .some((term) => searchable.includes(term));
+    })
+    .map((place) => ({
+      id: `wikipedia-${place.pageid}`,
+      provider: "Wikipedia",
+      dataProvider: "Wikipedia",
+      listingType: "business",
+      name: place.title || "Cultural site",
+      category: "cultural_site",
+      blackOwned: false,
+      verified: false,
+      address: city.label,
+      city: city.city,
+      state: city.state,
+      citySlug: slugifyCity(city.city, city.state),
+      website: `https://en.wikipedia.org/?curid=${place.pageid}`,
+      phone: "",
+      tags: ["cultural site", "Wikipedia"],
+      sourceUrl: `https://en.wikipedia.org/?curid=${place.pageid}`,
+      lat: place.lat || null,
+      lng: place.lon || null,
+      rating: 0,
+    }));
 }
 
 function friendlyProviderError(message) {
