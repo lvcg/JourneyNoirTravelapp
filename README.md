@@ -23,6 +23,7 @@ trip planner.
 - AI itinerary planner form that stores generated itinerary drafts per user.
 - Admin dashboard for approving submissions, rejecting spam, and publishing listings.
 - Firebase Cloud Messaging token capture for push notification campaigns.
+- Vercel API aggregation route for Foursquare, Eventbrite, and Geoapify.
 
 ## Firebase Collections
 
@@ -74,6 +75,19 @@ The app is structured around this MVP Firestore model:
 
 The app disables account-dependent actions until the Firebase placeholders in
 `app.js` are replaced.
+
+## Vercel Environment Variables
+
+Add these in Vercel Project Settings > Environment Variables:
+
+```bash
+FOURSQUARE_API_KEY=
+EVENTBRITE_PRIVATE_TOKEN=
+GEOAPIFY_API_KEY=
+```
+
+The aggregation route is `api/aggregate.js`, so these provider keys are never
+placed in frontend code.
 
 ## AI Itinerary Planner
 

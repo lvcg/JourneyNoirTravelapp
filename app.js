@@ -36,12 +36,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyBCPmGSZgievM91b1MVi9NE-g8Ba5U6kQ8",
+  authDomain: "journeynoir-ef587.firebaseapp.com",
+  projectId: "journeynoir-ef587",
+  storageBucket: "journeynoir-ef587.firebasestorage.app",
+  messagingSenderId: "439288472963",
+  appId: "1:439288472963:web:bb47f72ea4390511c9c2b6",
 };
 
 const vapidKey = "YOUR_FIREBASE_WEB_PUSH_CERTIFICATE_KEY_PAIR";
@@ -174,6 +174,7 @@ let isAdmin = false;
 let activeFilter = "all";
 let activeCity = "all";
 let publicListings = [];
+let aggregatedListings = [];
 let adminSubmissions = [];
 let favoritesCollection = null;
 let tripsCollection = null;
@@ -234,9 +235,14 @@ if (!hasFirebaseConfig) {
 cityFilter.addEventListener("change", () => {
   activeCity = cityFilter.value;
   renderGuide();
+  fetchAggregatedListings();
 });
 
-guideSearch.addEventListener("input", renderGuide);
+guideSearch.addEventListener("input", () => {
+  renderGuide();
+  window.clearTimeout(guideSearch.searchTimer);
+  guideSearch.searchTimer = window.setTimeout(fetchAggregatedListings, 450);
+});
 
 filters.forEach((filterButton) => {
   filterButton.addEventListener("click", () => {
@@ -244,6 +250,7 @@ filters.forEach((filterButton) => {
     filters.forEach((button) => button.classList.remove("active"));
     filterButton.classList.add("active");
     renderGuide();
+    fetchAggregatedListings();
   });
 });
 
@@ -433,6 +440,28 @@ function watchPublicListings() {
   });
 }
 
+async function fetchAggregatedListings() {
+  if (activeCity === "all") {
+    aggregatedListings = [];
+    renderGuide();
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      city: activeCity,
+      q: guideSearch.value.trim() || (activeFilter === "all" ? "" : activeFilter),
+    });
+    const response = await fetch(`/api/aggregate?${params}`);
+    if (!response.ok) return;
+    const payload = await response.json();
+    aggregatedListings = payload.results || [];
+    renderGuide();
+  } catch {
+    aggregatedListings = [];
+  }
+}
+
 function watchReviews() {
   onSnapshot(query(collection(db, "reviews"), orderBy("createdAt", "desc")), (snapshot) => {
     const reviews = snapshot.docs.slice(0, 6).map((reviewDoc) => reviewDoc.data());
@@ -512,7 +541,7 @@ function watchAdminSubmissions() {
 
 function renderGuide() {
   const searchTerm = guideSearch.value.trim().toLowerCase();
-  const listings = [...starterListings, ...publicListings]
+  const listings = [...starterListings, ...publicListings, ...aggregatedListings]
     .map(normalizeListing)
     .filter((listing) => {
       const matchesCity = activeCity === "all" || listing.citySlug === activeCity;
@@ -568,7 +597,7 @@ function renderGuide() {
 }
 
 function renderSelectOptions() {
-  const listings = [...starterListings, ...publicListings].map(normalizeListing);
+  const listings = [...starterListings, ...publicListings, ...aggregatedListings].map(normalizeListing);
   reviewListing.innerHTML = listings
     .map((listing) => `<option value="${listing.id}">${escapeHtml(listing.name)}</option>`)
     .join("");

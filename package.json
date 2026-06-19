@@ -1,0 +1,9 @@
+{
+  "name": "journey-noir-travelapp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check api/aggregate.js"
+  }
+}
