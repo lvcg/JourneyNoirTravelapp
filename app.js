@@ -61,9 +61,53 @@ const majorCities = [
   ["new-orleans-la", "New Orleans, LA"],
   ["new-york-ny", "New York, NY"],
   ["oakland-ca", "Oakland, CA"],
+  ["cleveland-oh", "Cleveland, OH"],
+  ["cincinnati-oh", "Cincinnati, OH"],
+  ["indianapolis-in", "Indianapolis, IN"],
+  ["las-vegas-nv", "Las Vegas, NV"],
+  ["memphis-tn", "Memphis, TN"],
+  ["minneapolis-mn", "Minneapolis, MN"],
+  ["nashville-tn", "Nashville, TN"],
+  ["orlando-fl", "Orlando, FL"],
   ["philadelphia-pa", "Philadelphia, PA"],
+  ["phoenix-az", "Phoenix, AZ"],
+  ["san-francisco-ca", "San Francisco, CA"],
+  ["seattle-wa", "Seattle, WA"],
+  ["st-louis-mo", "St. Louis, MO"],
+  ["tampa-fl", "Tampa, FL"],
   ["washington-dc", "Washington, DC"],
 ];
+
+const cityMeta = {
+  "atlanta-ga": { label: "Atlanta, GA", city: "Atlanta", state: "GA", lat: 33.749, lng: -84.388 },
+  "baltimore-md": { label: "Baltimore, MD", city: "Baltimore", state: "MD", lat: 39.2904, lng: -76.6122 },
+  "boston-ma": { label: "Boston, MA", city: "Boston", state: "MA", lat: 42.3601, lng: -71.0589 },
+  "charlotte-nc": { label: "Charlotte, NC", city: "Charlotte", state: "NC", lat: 35.2271, lng: -80.8431 },
+  "chicago-il": { label: "Chicago, IL", city: "Chicago", state: "IL", lat: 41.8781, lng: -87.6298 },
+  "cleveland-oh": { label: "Cleveland, OH", city: "Cleveland", state: "OH", lat: 41.4993, lng: -81.6944 },
+  "cincinnati-oh": { label: "Cincinnati, OH", city: "Cincinnati", state: "OH", lat: 39.1031, lng: -84.512 },
+  "dallas-tx": { label: "Dallas, TX", city: "Dallas", state: "TX", lat: 32.7767, lng: -96.797 },
+  "detroit-mi": { label: "Detroit, MI", city: "Detroit", state: "MI", lat: 42.3314, lng: -83.0458 },
+  "houston-tx": { label: "Houston, TX", city: "Houston", state: "TX", lat: 29.7604, lng: -95.3698 },
+  "indianapolis-in": { label: "Indianapolis, IN", city: "Indianapolis", state: "IN", lat: 39.7684, lng: -86.1581 },
+  "las-vegas-nv": { label: "Las Vegas, NV", city: "Las Vegas", state: "NV", lat: 36.1716, lng: -115.1391 },
+  "los-angeles-ca": { label: "Los Angeles, CA", city: "Los Angeles", state: "CA", lat: 34.0522, lng: -118.2437 },
+  "memphis-tn": { label: "Memphis, TN", city: "Memphis", state: "TN", lat: 35.1495, lng: -90.049 },
+  "miami-fl": { label: "Miami, FL", city: "Miami", state: "FL", lat: 25.7617, lng: -80.1918 },
+  "minneapolis-mn": { label: "Minneapolis, MN", city: "Minneapolis", state: "MN", lat: 44.9778, lng: -93.265 },
+  "nashville-tn": { label: "Nashville, TN", city: "Nashville", state: "TN", lat: 36.1627, lng: -86.7816 },
+  "new-orleans-la": { label: "New Orleans, LA", city: "New Orleans", state: "LA", lat: 29.9511, lng: -90.0715 },
+  "new-york-ny": { label: "New York, NY", city: "New York", state: "NY", lat: 40.7128, lng: -74.006 },
+  "oakland-ca": { label: "Oakland, CA", city: "Oakland", state: "CA", lat: 37.8044, lng: -122.2712 },
+  "orlando-fl": { label: "Orlando, FL", city: "Orlando", state: "FL", lat: 28.5383, lng: -81.3792 },
+  "philadelphia-pa": { label: "Philadelphia, PA", city: "Philadelphia", state: "PA", lat: 39.9526, lng: -75.1652 },
+  "phoenix-az": { label: "Phoenix, AZ", city: "Phoenix", state: "AZ", lat: 33.4484, lng: -112.074 },
+  "san-francisco-ca": { label: "San Francisco, CA", city: "San Francisco", state: "CA", lat: 37.7749, lng: -122.4194 },
+  "seattle-wa": { label: "Seattle, WA", city: "Seattle", state: "WA", lat: 47.6062, lng: -122.3321 },
+  "st-louis-mo": { label: "St. Louis, MO", city: "St. Louis", state: "MO", lat: 38.627, lng: -90.1994 },
+  "tampa-fl": { label: "Tampa, FL", city: "Tampa", state: "FL", lat: 27.9506, lng: -82.4572 },
+  "washington-dc": { label: "Washington, DC", city: "Washington", state: "DC", lat: 38.9072, lng: -77.0369 },
+};
 
 const starterListings = [
   {
@@ -154,6 +198,7 @@ const savedCount = $("#saved-count");
 const tripForm = $("#trip-form");
 const aiForm = $("#ai-form");
 const profileForm = $("#profile-form");
+const notificationPanel = $("#notification-panel");
 const notificationButton = $("#notification-button");
 const listingForm = $("#listing-form");
 const reviewForm = $("#review-form");
@@ -181,6 +226,7 @@ let tripsCollection = null;
 let submissionsCollection = null;
 let itinerariesCollection = null;
 let journalCollection = null;
+let lastGuideFetchKey = "";
 
 hydrateCityFilter();
 renderGuide();
@@ -195,6 +241,7 @@ if (!hasFirebaseConfig) {
   auth = getAuth(app);
   storage = getStorage(app);
   messaging = getMessaging(app);
+  notificationPanel.hidden = vapidKey.startsWith("YOUR_");
 
   watchPublicListings();
   watchReviews();
@@ -225,6 +272,7 @@ if (!hasFirebaseConfig) {
     journalCollection = collection(db, "users", user.uid, "journal");
 
     await ensureUserProfile(user);
+    watchUserProfile(user);
     watchSavedPlans();
     watchJournal();
     if (isAdmin) watchAdminSubmissions();
@@ -272,7 +320,7 @@ authForm.addEventListener("submit", async (event) => {
     }
     authForm.reset();
   } catch (error) {
-    setStatus(`Authentication failed: ${error.message}`);
+    setStatus(`Authentication failed: ${friendlyAuthError(error)}`);
   }
 });
 
@@ -287,104 +335,146 @@ logoutButton.addEventListener("click", () => {
 
 profileForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!currentUser) return;
+  if (!currentUser) {
+    setStatus("Login to save your traveler profile.");
+    return;
+  }
   const formData = new FormData(profileForm);
-  await setDoc(
-    doc(db, "users", currentUser.uid),
-    {
-      displayName: formData.get("displayName").trim(),
-      homeCity: formData.get("homeCity").trim(),
-      preferences: {
-        interests: splitTags(formData.get("interests")),
-        travelNotes: formData.get("travelNotes").trim(),
+  try {
+    await setDoc(
+      doc(db, "users", currentUser.uid),
+      {
+        displayName: formData.get("displayName").trim(),
+        homeCity: formData.get("homeCity").trim(),
+        preferences: {
+          interests: splitTags(formData.get("interests")),
+          travelNotes: formData.get("travelNotes").trim(),
+        },
+        updatedAt: serverTimestamp(),
       },
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
-  setStatus("Profile saved.");
+      { merge: true },
+    );
+    setStatus("Profile saved.");
+  } catch (error) {
+    setStatus(`Profile save failed: ${friendlyFirebaseError(error)}`);
+  }
 });
 
 tripForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!tripsCollection) return;
+  if (!tripsCollection) {
+    setStatus("Login to save trips.");
+    return;
+  }
   const formData = new FormData(tripForm);
-  await addDoc(tripsCollection, {
-    type: "trip",
-    title: formData.get("tripName").trim(),
-    city: formData.get("city").trim(),
-    startDate: formData.get("startDate"),
-    endDate: formData.get("endDate"),
-    notes: formData.get("notes").trim(),
-    createdAt: serverTimestamp(),
-  });
-  tripForm.reset();
-  setStatus("Trip saved.");
+  try {
+    await addDoc(tripsCollection, {
+      type: "trip",
+      title: formData.get("tripName").trim(),
+      city: formData.get("city").trim(),
+      startDate: formData.get("startDate"),
+      endDate: formData.get("endDate"),
+      notes: formData.get("notes").trim(),
+      createdAt: serverTimestamp(),
+    });
+    tripForm.reset();
+    setStatus("Trip saved.");
+  } catch (error) {
+    setStatus(`Trip save failed: ${friendlyFirebaseError(error)}`);
+  }
 });
 
 aiForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!itinerariesCollection) return;
+  if (!itinerariesCollection) {
+    setStatus("Login to save itineraries.");
+    return;
+  }
   const prompt = new FormData(aiForm).get("prompt").trim();
-  await addDoc(itinerariesCollection, {
-    prompt,
-    itinerary: buildDraftItinerary(prompt),
-    modelStatus: "draft_saved",
-    createdAt: serverTimestamp(),
-  });
-  aiForm.reset();
-  setStatus("AI itinerary draft saved.");
+  try {
+    await addDoc(itinerariesCollection, {
+      prompt,
+      itinerary: buildDraftItinerary(prompt),
+      modelStatus: "draft_saved",
+      createdAt: serverTimestamp(),
+    });
+    aiForm.reset();
+    setStatus("AI itinerary draft saved.");
+  } catch (error) {
+    setStatus(`Itinerary save failed: ${friendlyFirebaseError(error)}`);
+  }
 });
 
 listingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!submissionsCollection || !currentUser) return;
+  if (!submissionsCollection || !currentUser) {
+    setStatus("Login to submit listings.");
+    return;
+  }
   const formData = new FormData(listingForm);
-  await addDoc(submissionsCollection, {
-    ...buildListingFromForm(formData),
-    submittedBy: currentUser.uid,
-    status: "pending_review",
-    createdAt: serverTimestamp(),
-  });
-  listingForm.reset();
-  setStatus("Listing submitted for admin approval.");
+  try {
+    await addDoc(submissionsCollection, {
+      ...buildListingFromForm(formData),
+      submittedBy: currentUser.uid,
+      status: "pending_review",
+      createdAt: serverTimestamp(),
+    });
+    listingForm.reset();
+    setStatus("Listing submitted for admin approval.");
+  } catch (error) {
+    setStatus(`Listing submit failed: ${friendlyFirebaseError(error)}`);
+  }
 });
 
 reviewForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!currentUser || !storage) return;
+  if (!currentUser || !storage) {
+    setStatus("Login to post reviews.");
+    return;
+  }
   const formData = new FormData(reviewForm);
-  const photo = formData.get("photo");
-  const photoUrl = photo?.size ? await uploadUserFile(photo, "reviews") : "";
-  await addDoc(collection(db, "reviews"), {
-    listingId: formData.get("listingId"),
-    userId: currentUser.uid,
-    rating: Number(formData.get("rating")),
-    comment: formData.get("comment").trim(),
-    photoUrl,
-    createdAt: serverTimestamp(),
-  });
-  reviewForm.reset();
-  setStatus("Review posted.");
+  try {
+    const photo = formData.get("photo");
+    const photoUrl = photo?.size ? await uploadUserFile(photo, "reviews") : "";
+    await addDoc(collection(db, "reviews"), {
+      listingId: formData.get("listingId"),
+      userId: currentUser.uid,
+      rating: Number(formData.get("rating")),
+      comment: formData.get("comment").trim(),
+      photoUrl,
+      createdAt: serverTimestamp(),
+    });
+    reviewForm.reset();
+    setStatus("Review posted.");
+  } catch (error) {
+    setStatus(`Review failed: ${friendlyFirebaseError(error)}`);
+  }
 });
 
 journalForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!journalCollection || !storage) return;
-  const formData = new FormData(journalForm);
-  const photoUrls = [];
-  for (const file of journalForm.elements.photos.files) {
-    photoUrls.push(await uploadUserFile(file, "journal"));
+  if (!journalCollection || !storage) {
+    setStatus("Login to save journal entries.");
+    return;
   }
-  await addDoc(journalCollection, {
-    title: formData.get("title").trim(),
-    favoritePlaces: splitTags(formData.get("favoritePlaces")),
-    notes: formData.get("notes").trim(),
-    photoUrls,
-    createdAt: serverTimestamp(),
-  });
-  journalForm.reset();
-  setStatus("Journal entry saved.");
+  const formData = new FormData(journalForm);
+  try {
+    const photoUrls = [];
+    for (const file of journalForm.elements.photos.files) {
+      photoUrls.push(await uploadUserFile(file, "journal"));
+    }
+    await addDoc(journalCollection, {
+      title: formData.get("title").trim(),
+      favoritePlaces: splitTags(formData.get("favoritePlaces")),
+      notes: formData.get("notes").trim(),
+      photoUrls,
+      createdAt: serverTimestamp(),
+    });
+    journalForm.reset();
+    setStatus("Journal entry saved.");
+  } catch (error) {
+    setStatus(`Journal save failed: ${friendlyFirebaseError(error)}`);
+  }
 });
 
 notificationButton.addEventListener("click", async () => {
@@ -407,7 +497,7 @@ async function signInWithProvider(provider) {
     await signInWithPopup(auth, provider);
     setStatus("Logged in.");
   } catch (error) {
-    setStatus(`Provider login failed: ${error.message}`);
+    setStatus(`Provider login failed: ${friendlyAuthError(error)}`);
   }
 }
 
@@ -436,8 +526,19 @@ function watchPublicListings() {
       renderGuide();
       renderSelectOptions();
       setDisabledState(!currentUser);
-    });
-  });
+    }, (error) => console.warn("Events unavailable", friendlyFirebaseError(error)));
+  }, (error) => console.warn("Business listings unavailable", friendlyFirebaseError(error)));
+}
+
+function watchUserProfile(user) {
+  onSnapshot(doc(db, "users", user.uid), (profileSnap) => {
+    if (!profileSnap.exists()) return;
+    const profile = profileSnap.data();
+    profileForm.elements.displayName.value = profile.displayName || "";
+    profileForm.elements.homeCity.value = profile.homeCity || "";
+    profileForm.elements.interests.value = (profile.preferences?.interests || []).join(", ");
+    profileForm.elements.travelNotes.value = profile.preferences?.travelNotes || "";
+  }, (error) => setStatus(`Profile unavailable: ${friendlyFirebaseError(error)}`));
 }
 
 async function fetchAggregatedListings() {
@@ -447,18 +548,77 @@ async function fetchAggregatedListings() {
     return;
   }
 
+  const fetchKey = `${activeCity}|${activeFilter}|${guideSearch.value.trim()}`;
+  if (fetchKey === lastGuideFetchKey) return;
+  lastGuideFetchKey = fetchKey;
+
   try {
     const params = new URLSearchParams({
       city: activeCity,
       q: guideSearch.value.trim() || (activeFilter === "all" ? "" : activeFilter),
     });
     const response = await fetch(`/api/aggregate?${params}`);
-    if (!response.ok) return;
+    if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
+      throw new Error("Serverless aggregator unavailable");
+    }
     const payload = await response.json();
-    aggregatedListings = payload.results || [];
+    aggregatedListings = payload.results?.length
+      ? payload.results
+      : await fetchClientSideCulturalListings(activeCity, guideSearch.value.trim());
     renderGuide();
   } catch {
-    aggregatedListings = [];
+    aggregatedListings = await fetchClientSideCulturalListings(activeCity, guideSearch.value.trim());
+    renderGuide();
+  }
+}
+
+async function fetchClientSideCulturalListings(citySlug, searchTerm = "") {
+  const city = cityMeta[citySlug];
+  if (!city) return [];
+
+  try {
+    const url = new URL("https://en.wikipedia.org/w/api.php");
+    url.searchParams.set("origin", "*");
+    url.searchParams.set("action", "query");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("list", "geosearch");
+    url.searchParams.set("gscoord", `${city.lat}|${city.lng}`);
+    url.searchParams.set("gsradius", "10000");
+    url.searchParams.set("gslimit", "18");
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Wikipedia unavailable");
+    const payload = await response.json();
+    return (payload.query?.geosearch || [])
+      .map((place) => ({
+        id: `wikipedia-${place.pageid}`,
+        provider: "Wikipedia",
+        dataProvider: "Wikipedia",
+        listingType: "business",
+        name: place.title || "Cultural site",
+        category: "cultural_site",
+        blackOwned: false,
+        verified: false,
+        address: city.label,
+        city: city.city,
+        state: city.state,
+        citySlug,
+        website: `https://en.wikipedia.org/?curid=${place.pageid}`,
+        tags: ["cultural site", "Wikipedia"],
+        sourceUrl: `https://en.wikipedia.org/?curid=${place.pageid}`,
+        lat: place.lat || null,
+        lng: place.lon || null,
+        rating: 0,
+      }))
+      .filter((listing) => {
+        const term = searchTerm.toLowerCase();
+        if (!term) return true;
+        return [listing.name, listing.city, listing.state, listing.category, ...(listing.tags || [])]
+          .join(" ")
+          .toLowerCase()
+          .includes(term);
+      });
+  } catch {
+    return [];
   }
 }
 
@@ -475,7 +635,7 @@ function watchReviews() {
           )
           .join("")
       : '<div class="empty-state">No reviews yet.</div>';
-  });
+  }, (error) => console.warn("Reviews unavailable", friendlyFirebaseError(error)));
 }
 
 function watchSavedPlans() {
@@ -491,7 +651,7 @@ function watchSavedPlans() {
       ...item.data(),
     }));
     renderSavedPlans(state);
-  });
+  }, (error) => setStatus(`Favorites unavailable: ${friendlyFirebaseError(error)}`));
   onSnapshot(tripsQuery, (snapshot) => {
     state.trips = snapshot.docs.map((item) => ({
       id: item.id,
@@ -499,7 +659,7 @@ function watchSavedPlans() {
       ...item.data(),
     }));
     renderSavedPlans(state);
-  });
+  }, (error) => setStatus(`Trips unavailable: ${friendlyFirebaseError(error)}`));
   onSnapshot(itinerariesQuery, (snapshot) => {
     state.itineraries = snapshot.docs.map((item) => ({
       id: item.id,
@@ -507,7 +667,7 @@ function watchSavedPlans() {
       ...item.data(),
     }));
     renderSavedPlans(state);
-  });
+  }, (error) => setStatus(`Itineraries unavailable: ${friendlyFirebaseError(error)}`));
 }
 
 function watchJournal() {
@@ -523,7 +683,7 @@ function watchJournal() {
           )
           .join("")
       : '<div class="empty-state">No journal memories yet.</div>';
-  });
+  }, (error) => setStatus(`Journal unavailable: ${friendlyFirebaseError(error)}`));
 }
 
 function watchAdminSubmissions() {
@@ -567,7 +727,7 @@ function renderGuide() {
 
   if (!listings.length) {
     guideGrid.innerHTML =
-      '<div class="empty-state">No verified businesses or events found for this city yet.</div>';
+      '<div class="empty-state">No listings found for this city yet. Try another search or filter.</div>';
     return;
   }
 
@@ -853,6 +1013,29 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function friendlyAuthError(error) {
+  const code = error?.code || "";
+  const messages = {
+    "auth/email-already-in-use": "That email already has an account. Try logging in.",
+    "auth/invalid-credential": "Email or password is incorrect.",
+    "auth/operation-not-allowed": "Enable this sign-in provider in Firebase Authentication.",
+    "auth/popup-closed-by-user": "Login popup closed before finishing.",
+    "auth/unauthorized-domain": "Add this Vercel domain to Firebase Authentication authorized domains.",
+    "auth/weak-password": "Use a password with at least 6 characters.",
+  };
+  return messages[code] || error?.message || "Please try again.";
+}
+
+function friendlyFirebaseError(error) {
+  const code = error?.code || "";
+  const messages = {
+    "permission-denied": "Firebase rules blocked this action for the current account.",
+    "unavailable": "Firebase is temporarily unavailable. Try again shortly.",
+    "unauthenticated": "Login is required for this action.",
+  };
+  return messages[code] || error?.message || "Please try again.";
 }
 
 function setStatus(message) {
