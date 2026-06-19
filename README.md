@@ -1,69 +1,88 @@
-# Rooted Routes
+# Journey Noir
 
-A simple Firebase-powered Black travel guide, major-city business/event
-aggregator, and trip planner.
+A Firebase-powered Black travel guide, major-city business/event aggregator, and
+trip planner.
 
 ## Screenshots
 
-![Rooted Routes homepage](docs/screenshots/home.png)
+![Journey Noir homepage](docs/screenshots/home.png)
 
 ![Mobile layout](docs/screenshots/mobile.png)
 
-## Features
+## MVP Features
 
-- Public guide page for major-city businesses, events, and cultural attractions.
-- City, search, type, and category filters.
-- Email/password login and logout with Firebase Authentication.
-- Save businesses, events, and guide entries to a signed-in user's Firestore account.
-- Create private trip plans with city, dates, and notes.
-- Submit business or event listing candidates with verification fields.
-- Firestore rules for private user data and pending user-submitted listings.
-- Public `publicListings` collection support for reviewed aggregate listings.
+- Email/password, Google, and Apple login with Firebase Authentication.
+- Saved traveler profiles and preferences.
+- Major-city guide with businesses, events, museums, cultural attractions, and city filters.
+- Business listing cards with category, city/state, verification state, tags, source links, ratings, and map coordinates.
+- Interactive OpenStreetMap panel for listings with latitude/longitude.
+- Favorite places, trip wishlists, bookmarked city-style filtering, and saved itineraries.
+- User-submitted business/event form with proof field and pending approval status.
+- Reviews with star ratings, comments, travel tips, and optional photo upload.
+- Travel journal with notes, favorite places visited, and Firebase Storage photo uploads.
+- AI itinerary planner form that stores generated itinerary drafts per user.
+- Admin dashboard for approving submissions, rejecting spam, and publishing listings.
+- Firebase Cloud Messaging token capture for push notification campaigns.
 
-## Data model
+## Firebase Collections
 
-Submitted listings collect this shape:
+The app is structured around this MVP Firestore model:
+
+- `users`
+- `businesses`
+- `cities`
+- `favorites` under each user
+- `reviews`
+- `submissions`
+- `itineraries` under each user
+- `events`
+- `journal` under each user
+
+## Example Business Document
 
 ```json
 {
-  "name": "",
-  "listingType": "business | event",
-  "category": "restaurant | hotel | museum | cultural_site",
+  "name": "Example Restaurant",
+  "category": "restaurant",
+  "city": "Chicago",
+  "state": "IL",
   "blackOwned": true,
-  "ownershipSource": "",
-  "address": "",
-  "city": "",
-  "state": "",
-  "website": "",
-  "phone": "",
-  "hours": "",
-  "eventDate": "",
-  "priceRange": "",
-  "tags": ["soul food", "brunch", "historic", "family-friendly"],
-  "latitude": "",
-  "longitude": "",
-  "sourceUrl": "",
-  "lastVerified": ""
+  "verified": true,
+  "address": "123 Main St",
+  "website": "https://example.com",
+  "tags": ["brunch", "soul food", "Black-owned"],
+  "rating": 4.8,
+  "lat": 41.8781,
+  "lng": -87.6298,
+  "createdAt": 1792368000000
 }
 ```
 
-User-submitted listings are written to `userSubmittedListings` with
-`status: "pending_review"` so they can be reviewed before publication.
-Reviewed listings can be published to `publicListings` for the city aggregator.
-
-## Firebase setup
+## Firebase Setup
 
 1. Create a Firebase project at <https://console.firebase.google.com/>.
 2. Add a web app in Project settings.
 3. Copy the web app config into `app.js`.
-4. Enable Authentication, then enable the Email/Password provider.
-5. Create a Cloud Firestore database.
-6. Publish the rules from `firestore.rules`.
+4. Enable Authentication providers:
+   - Email/Password
+   - Google
+   - Apple
+5. Create a Cloud Firestore database and publish `firestore.rules`.
+6. Enable Firebase Storage and publish `storage.rules`.
+7. For push notifications, create a Web Push certificate and place the public VAPID key in `app.js`.
+8. Add a custom auth claim of `admin: true` for admin users so the dashboard can approve submissions.
 
 The app disables account-dependent actions until the Firebase placeholders in
 `app.js` are replaced.
 
-## Run locally
+## AI Itinerary Planner
+
+The static MVP stores itinerary prompts and placeholder generated drafts in each
+user's `itineraries` collection. Connect the `#ai-form` submit handler in
+`app.js` to a secure server endpoint or Firebase Cloud Function before using a
+paid AI model in production.
+
+## Run Locally
 
 Serve the folder with any static server.
 

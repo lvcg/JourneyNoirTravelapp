@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rooted Routes | Black Travel Guide</title>
+    <title>Journey Noir | Black Travel Guide</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -14,13 +14,15 @@
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="#home" aria-label="Rooted Routes home">
-        <span class="brand-mark">RR</span>
-        <span>Rooted Routes</span>
+      <a class="brand" href="#home" aria-label="Journey Noir home">
+        <span class="brand-mark">JN</span>
+        <span>Journey Noir</span>
       </a>
       <nav aria-label="Primary navigation">
         <a href="#guide">Guide</a>
         <a href="#planner">Planner</a>
+        <a href="#journal">Journal</a>
+        <a href="#admin">Admin</a>
         <a href="#login">Login</a>
       </nav>
     </header>
@@ -70,7 +72,22 @@
           </div>
         </div>
 
-        <div class="guide-grid" id="guide-grid"></div>
+        <div class="map-layout">
+          <div class="guide-grid" id="guide-grid"></div>
+          <aside class="map-panel" aria-labelledby="map-title">
+            <div>
+              <p class="eyebrow">Map view</p>
+              <h3 id="map-title">Select a listing</h3>
+              <p id="map-copy">Listings with latitude and longitude appear here.</p>
+            </div>
+            <iframe
+              id="map-frame"
+              title="Selected listing map"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+            ></iframe>
+          </aside>
+        </div>
       </section>
 
       <section class="split-band" id="planner" aria-labelledby="planner-title">
@@ -110,6 +127,20 @@
               ></textarea>
             </label>
             <button class="button button-primary" type="submit">Save trip</button>
+          </form>
+
+          <form class="stacked-form ai-form" id="ai-form">
+            <p class="eyebrow">AI itinerary planner</p>
+            <label>
+              Prompt
+              <textarea
+                name="prompt"
+                rows="3"
+                placeholder="Plan a 3-day Black-owned food and culture trip in Chicago."
+                required
+              ></textarea>
+            </label>
+            <button class="button button-secondary" type="submit">Generate itinerary</button>
           </form>
         </div>
 
@@ -159,6 +190,14 @@
               </button>
             </div>
           </form>
+          <div class="button-row">
+            <button class="button button-secondary" id="google-login" type="button">
+              Google login
+            </button>
+            <button class="button button-secondary" id="apple-login" type="button">
+              Apple login
+            </button>
+          </div>
         </div>
 
         <div class="panel logout-panel" aria-labelledby="account-title">
@@ -167,6 +206,44 @@
           <p id="account-copy">Add Firebase config to enable account features.</p>
           <button class="button button-secondary" id="logout-button" type="button">
             Logout
+          </button>
+        </div>
+      </section>
+
+      <section class="split-band" id="profile" aria-labelledby="profile-title">
+        <div class="panel">
+          <p class="eyebrow">Saved profile</p>
+          <h2 id="profile-title">Traveler preferences</h2>
+          <form class="stacked-form" id="profile-form">
+            <label>
+              Display name
+              <input name="displayName" type="text" placeholder="Ari" />
+            </label>
+            <label>
+              Home city
+              <input name="homeCity" type="text" placeholder="Chicago" />
+            </label>
+            <label>
+              Interests
+              <input name="interests" type="text" placeholder="brunch, jazz, museums" />
+            </label>
+            <label>
+              Accessibility / travel notes
+              <textarea name="travelNotes" rows="3"></textarea>
+            </label>
+            <button class="button button-primary" type="submit">Save profile</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <p class="eyebrow">Push notifications</p>
+          <h2>Trip reminders</h2>
+          <p>
+            Enable Firebase Cloud Messaging for new city guides, event reminders,
+            saved trip reminders, and nearby cultural attractions.
+          </p>
+          <button class="button button-secondary" id="notification-button" type="button">
+            Enable notifications
           </button>
         </div>
       </section>
@@ -261,9 +338,92 @@
               Source URL
               <input name="sourceUrl" type="url" required />
             </label>
+            <label>
+              Proof it is Black-owned
+              <input
+                name="proof"
+                type="url"
+                placeholder="Business page, directory listing, or owner statement"
+              />
+            </label>
           </div>
           <button class="button button-primary" type="submit">Submit listing</button>
         </form>
+      </section>
+
+      <section class="split-band" id="reviews" aria-labelledby="reviews-title">
+        <div class="panel">
+          <p class="eyebrow">Reviews and ratings</p>
+          <h2 id="reviews-title">Leave travel tips</h2>
+          <form class="stacked-form" id="review-form">
+            <label>
+              Listing
+              <select name="listingId" id="review-listing"></select>
+            </label>
+            <label>
+              Stars
+              <input name="rating" type="number" min="1" max="5" step="1" value="5" />
+            </label>
+            <label>
+              Comment
+              <textarea name="comment" rows="3" placeholder="What should travelers know?"></textarea>
+            </label>
+            <label>
+              Photo
+              <input name="photo" type="file" accept="image/*" />
+            </label>
+            <button class="button button-primary" type="submit">Post review</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <p class="eyebrow">Community tips</p>
+          <h2>Recent reviews</h2>
+          <div class="saved-list" id="reviews-list"></div>
+        </div>
+      </section>
+
+      <section class="split-band" id="journal" aria-labelledby="journal-title">
+        <div class="panel">
+          <p class="eyebrow">Travel journal</p>
+          <h2 id="journal-title">Photos and memories</h2>
+          <form class="stacked-form" id="journal-form">
+            <label>
+              Trip title
+              <input name="title" type="text" placeholder="Chicago summer trip" required />
+            </label>
+            <label>
+              Favorite places visited
+              <input name="favoritePlaces" type="text" placeholder="Bronzeville, DuSable Museum" />
+            </label>
+            <label>
+              Notes
+              <textarea name="notes" rows="4"></textarea>
+            </label>
+            <label>
+              Photos
+              <input name="photos" type="file" accept="image/*" multiple />
+            </label>
+            <button class="button button-primary" type="submit">Save memory</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <p class="eyebrow">Saved memories</p>
+          <h2>Journal entries</h2>
+          <div class="saved-list" id="journal-list"></div>
+        </div>
+      </section>
+
+      <section class="content-band" id="admin" aria-labelledby="admin-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Admin dashboard</p>
+            <h2 id="admin-title">Approve and verify listings</h2>
+          </div>
+          <span class="count-pill" id="admin-count">0</span>
+        </div>
+        <div class="admin-grid" id="admin-list"></div>
       </section>
 
     </main>
@@ -293,6 +453,9 @@
         </dl>
         <button class="button button-secondary" type="button" data-save-place>
           Save place
+        </button>
+        <button class="button button-secondary" type="button" data-map-place>
+          Show map
         </button>
       </article>
     </template>

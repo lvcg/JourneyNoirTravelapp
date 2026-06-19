@@ -2,26 +2,65 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/savedPlaces/{placeId} {
-      allow read, create, update, delete: if request.auth != null
-        && request.auth.uid == userId;
+    function signedIn() {
+      return request.auth != null;
     }
 
-    match /users/{userId}/trips/{tripId} {
-      allow read, create, update, delete: if request.auth != null
-        && request.auth.uid == userId;
+    function owns(userId) {
+      return signedIn() && request.auth.uid == userId;
     }
 
-    match /userSubmittedListings/{listingId} {
-      allow create: if request.auth != null
+    function admin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    match /users/{userId} {
+      allow read, create, update: if owns(userId) || admin();
+      allow delete: if admin();
+
+      match /favorites/{favoriteId} {
+        allow read, create, update, delete: if owns(userId);
+      }
+
+      match /trips/{tripId} {
+        allow read, create, update, delete: if owns(userId);
+      }
+
+      match /itineraries/{itineraryId} {
+        allow read, create, update, delete: if owns(userId);
+      }
+
+      match /journal/{entryId} {
+        allow read, create, update, delete: if owns(userId);
+      }
+    }
+
+    match /businesses/{businessId} {
+      allow read: if true;
+      allow create, update, delete: if admin();
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if admin();
+    }
+
+    match /cities/{cityId} {
+      allow read: if true;
+      allow create, update, delete: if admin();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if admin();
+    }
+
+    match /submissions/{submissionId} {
+      allow create: if signedIn()
         && request.resource.data.submittedBy == request.auth.uid
         && request.resource.data.status == 'pending_review';
-      allow read, update, delete: if false;
-    }
-
-    match /publicListings/{listingId} {
-      allow read: if true;
-      allow create, update, delete: if false;
+      allow read, update, delete: if admin();
     }
   }
 }
